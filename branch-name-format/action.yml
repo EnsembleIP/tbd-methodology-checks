@@ -37,7 +37,7 @@ runs:
           const { data: comments } = await github.rest.issues.listComments({
             owner,
             repo,
-            issue_number: prNumber
+            issue_number: prNumber,
             per_page: 100
           });
 
