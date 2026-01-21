@@ -57,3 +57,11 @@ jobs:
         run: |
           echo "Linting all YAML files..."
           yamllint -f colored .
+
+  ci-pass:
+    name: CI Pass
+    needs: [methodology-checks, validate-structure, lint-yaml]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pass CI
+        run: echo "CI passed"
