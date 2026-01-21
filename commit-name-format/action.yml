@@ -1,5 +1,5 @@
 name: "TBD Methodology Checks - Commit Message Format"
-description: "Validates commit messages in PRs. Ensures commits follow [QD-{number}] {message} format. Posts PR comments for violations."
+description: Validates commit messages in PRs. Ensures commits follow the given pattern.
 author: "EnsembleIP"
 
 inputs:
@@ -35,7 +35,7 @@ runs:
             owner,
             repo,
             pull_number: prNumber,
-            per_page: 100
+            per_page: 100,
           });
 
           core.info(`Found ${commits.length} total commits in PR.`);
@@ -94,7 +94,8 @@ runs:
               `- \`${c.sha}\`: ${c.message}`
             ).join('\n');
             let commentBody = `${msgMarker}\n### ❌ Commit Name Validation Failed\n\n`;
-            commentBody += `The following commit(s) do not follow the required format \`[QD-{issue-key}] {message}\`:\n\n`;
+            commentBody += `The following commit(s) do not follow the required format ` +
+              `\`[QD-{issue-key}] {message}\`:\n\n`;
             commentBody += `${commitList}\n\n`;
             commentBody += `**Required format:** \`[QD-123] Your commit message here\`\n\n`;
             commentBody += `Please update the commit messages to follow the required format. You can use:\n`;

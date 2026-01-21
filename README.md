@@ -45,8 +45,8 @@ jobs:
 |-------|-------------|----------|---------|
 | `cherry-pick-branch-regex` | Regular expression pattern for validating cherry-pick branch names | No | `^bug/QD-\\d+-.+-cherry-pick$` |
 | `example-cherry-pick-branch` | Example branch name to display in error messages | No | `bug/QD-1234-bug-description-cherry-pick` |
-| `branch-pattern` | Regular expression pattern for validating branch name format | No | `^(bug\|story\|task\|spike)/QD-\\d+-[a-z0-9-]+` |
-| `commit-pattern` | Regular expression pattern for validating commit message format | No | `^\\[QD-\\d+\\] .+` |
+| `branch-pattern` | Regular expression pattern for validating branch name format | No | `^(bug\|story\|task\|spike)/QD-\\d+-[a-z0-9-]+$` |
+| `commit-pattern` | Regular expression pattern for validating commit message format | No | `^\\[QD-\\d+\\] .+$` |
 
 ## How It Works
 

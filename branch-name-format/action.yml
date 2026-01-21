@@ -1,5 +1,5 @@
 name: "TBD Methodology Checks - Branch Name Format"
-description: "Validates branch names in PRs. Ensures branch names follow the pattern (bug|story|task|spike)/QD-{number}-{description}. Posts PR comments for violations."
+description: Validates branch names.
 author: "EnsembleIP"
 
 inputs:
