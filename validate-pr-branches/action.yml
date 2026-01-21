@@ -1,5 +1,5 @@
 name: "TBD Methodology Checks - PR Branches"
-description: "Prevents release branches from being merged and validates that PRs targeting release branches follow the cherry-pick naming format"
+description: Validates PR base and head branches.
 author: "EnsembleIP"
 
 inputs:
