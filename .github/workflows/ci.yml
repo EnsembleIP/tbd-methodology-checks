@@ -11,6 +11,18 @@ permissions:
   pull-requests: write
 
 jobs:
+  methodology-checks:
+    name: Methodology Checks
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run TBD Methodology Checks
+        uses: ./
   validate-structure:
     name: Validate Repository Structure
     runs-on: ubuntu-latest
@@ -45,16 +57,3 @@ jobs:
         run: |
           echo "Linting all YAML files..."
           yamllint -f colored .
-
-  methodology-checks:
-    name: Run Methodology Checks
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Run TBD Methodology Checks
-        uses: ./
