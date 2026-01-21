@@ -1,100 +1,44 @@
-name: "PR Check"
-description: "Validates that PRs comply with our Trunk-based Development Process"
+name: "TBD Methodology Checks"
+description: "Validates that PRs comply with Trunk-based Development (TBD) methodology"
 author: "EnsembleIP"
 
 inputs:
-  branch-regex:
+  cherry-pick-branch-regex:
     description: "Regular expression pattern for validating cherry-pick branch names."
     required: false
     default: "^bug/QD-\\d+-.+-cherry-pick$"
-  example-branch:
+  example-cherry-pick-branch:
     description: "Example branch name to display in error messages."
     required: false
     default: "bug/QD-1234-bug-description-cherry-pick"
+  branch-pattern:
+    description: "Regular expression pattern for validating branch name format."
+    required: false
+    default: "^(bug|story|task|spike)/QD-\\d+-[a-z0-9-]+"
+  commit-pattern:
+    description: "Regular expression pattern for validating commit message format."
+    required: false
+    default: "^\\[QD-\\d+\\] .+"
 
 runs:
   using: "composite"
   steps:
-    - name: Validate head branch correctness
-      uses: actions/github-script@v7
-      env:
-        BRANCH_REGEX: ${{ inputs.branch-regex }}
-        EXAMPLE_BRANCH: ${{ inputs.example-branch }}
+    - name: Check PR branches
+      uses: ./validate-pr-branches
       with:
-        script: |
-          if (context.eventName !== 'pull_request' || !context.payload.pull_request) {
-            core.info('Not a pull_request event; skipping head branch correctness validation.');
-            return;
-          }
+        cherry-pick-branch-regex: ${{ inputs.cherry-pick-branch-regex }}
+        example-cherry-pick-branch: ${{ inputs.example-cherry-pick-branch }}
 
-          const pr = context.payload.pull_request;
-          const baseRef = pr.base?.ref || '';
-          const headRef = pr.head?.ref || '';
+    - name: Validate branch name format
+      uses: ./branch-name-format
+      with:
+        branch-pattern: ${{ inputs.branch-pattern }}
 
-          // Check if head branch is a release/* branch - these are dead ends and should never be merged
-          if (headRef.startsWith('release/')) {
-            const body =
-              `**Release branches are dead ends** and are never merged back.\n\n` +
-              `Your head branch is \`${headRef}\`, which is a release branch. ` +
-              `Release branches should not be merged into other branches. Closing this PR now.`;
+    - name: Validate commit name format
+      uses: ./commit-name-format
+      with:
+        commit-pattern: ${{ inputs.commit-pattern }}
 
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: pr.number,
-              body,
-            });
-
-            await github.rest.pulls.update({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: pr.number,
-              state: 'closed',
-            });
-
-            core.setFailed(
-              `Head branch "${headRef}" is a release branch and cannot be merged. Release branches are dead ends.`
-            );
-            return;
-          }
-
-          if (!baseRef.startsWith('release/')) {
-            core.info(`Base branch is "${baseRef}", not release/*; skipping.`);
-            return;
-          }
-
-          const branchRegex = new RegExp(process.env.BRANCH_REGEX);
-          const exampleBranch = process.env.EXAMPLE_BRANCH;
-          const isAllowed = branchRegex.test(headRef);
-
-          if (isAllowed) {
-            core.info(`Head branch "${headRef}" matches expected cherry-pick format; ok.`);
-            return;
-          }
-
-          const body =
-            `**Only bug cherry-pick PRs are allowed** for release branches.\n\n` +
-            `Your head branch is \`${headRef}\`, which does not match the required format:\n\n` +
-            `- \`${exampleBranch}\`\n\n` +
-            `Please rename your branch to the correct format and open a new PR. Closing this PR now.`;
-
-          await github.rest.issues.createComment({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            issue_number: pr.number,
-            body,
-          });
-
-          await github.rest.pulls.update({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            pull_number: pr.number,
-            state: 'closed',
-          });
-
-          core.setFailed(
-            `Invalid head branch "${headRef}" for base "${baseRef}". Required format: ${exampleBranch}`
-          );
 branding:
   icon: "git-branch"
   color: "red"
