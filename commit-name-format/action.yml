@@ -28,34 +28,34 @@ runs:
           const repo = context.repo.repo;
           const prNumber = context.payload.pull_request.number;
           const msgMarker = process.env.COMMENT_MARKER;
-          
-          // Fetch all commits in the PR
+
+          // Fetch all commits in the PR (with pagination to handle PRs with >100 commits)
           core.info(`Fetching commits for PR #${prNumber}...`);
-          const { data: commits } = await github.rest.pulls.listCommits({
+          const commits = await github.paginate(github.rest.pulls.listCommits, {
             owner,
             repo,
             pull_number: prNumber,
             per_page: 100
           });
-          
+
           core.info(`Found ${commits.length} total commits in PR.`);
-          
+
           // Filter out merge commits
           const nonMergeCommits = commits.filter(commit => {
             const isMerge = commit.parents && commit.parents.length > 1;
             const messageStartsWithMerge = commit.commit.message.startsWith("Merge");
             return !isMerge && !messageStartsWithMerge;
           });
-          
+
           core.info(`Validating ${nonMergeCommits.length} non-merge commits...`);
-          
+
           // Validate commit messages against the pattern
           const invalidCommits = [];
-          
+
           for (const commit of nonMergeCommits) {
             const message = commit.commit.message;
             const firstLine = message.split('\n')[0];
-            
+
             if (!pattern.test(firstLine)) {
               invalidCommits.push({
                 sha: commit.sha.substring(0, 7),
@@ -64,7 +64,7 @@ runs:
               });
             }
           }
-          
+
           const isValid = invalidCommits.length === 0;
 
           // Find existing comment from this action
@@ -72,12 +72,12 @@ runs:
             owner,
             repo,
             issue_number: prNumber
+            per_page: 100
           });
-          
-          const existingComment = comments.find(comment => 
+
+          const existingComment = comments.find(comment =>
             comment.body && comment.body.includes(msgMarker)
           );
-          
           if (isValid) {
             if (existingComment) {
               // Delete previous comment
@@ -90,7 +90,7 @@ runs:
             }
             core.info("✅ All commits follow the required naming format!");
           } else {
-            const commitList = invalidCommits.map(c => 
+            const commitList = invalidCommits.map(c =>
               `- \`${c.sha}\`: ${c.message}`
             ).join('\n');
             let commentBody = `${msgMarker}\n### ❌ Commit Name Validation Failed\n\n`;
@@ -105,26 +105,26 @@ runs:
             commentBody += `*Note: Merge commits are automatically excluded from this validation.*\n`;
 
             // Create or update comment
-          if (existingComment) {
-            core.info("Updating existing validation comment...");
-            await github.rest.issues.updateComment({
-              owner,
-              repo,
-              comment_id: existingComment.id,
-              body: commentBody
-            });
-            core.info("Existing comment updated.");
-          } else {
-            core.info("Creating new validation comment...");
-            await github.rest.issues.createComment({
-              owner,
-              repo,
-              issue_number: prNumber,
-              body: commentBody
-            });
-            core.info("New comment created.");
+            if (existingComment) {
+              core.info("Updating existing validation comment...");
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existingComment.id,
+                body: commentBody
+              });
+              core.info("Existing comment updated.");
+            } else {
+              core.info("Creating new validation comment...");
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body: commentBody
+              });
+              core.info("New comment created.");
+            }
+
+            // Fail the action
+            core.setFailed(`${invalidCommits.length} commit(s) with invalid names`);
           }
-          
-          // Fail the action
-          core.setFailed(`${invalidCommits.length} commit(s) with invalid names`);
-          

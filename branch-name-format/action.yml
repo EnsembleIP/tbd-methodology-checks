@@ -31,17 +31,17 @@ runs:
           const prNumber = context.payload.pull_request.number;
 
           core.info(`Validating branch name: ${branchName}`);
-          
+
           const isValid = branchPattern.test(branchName);
-          
           // Find and delete existing comment from this action
           const { data: comments } = await github.rest.issues.listComments({
             owner,
             repo,
             issue_number: prNumber
+            per_page: 100
           });
 
-          const existingComment = comments.find(comment => 
+          const existingComment = comments.find(comment =>
             comment.body && comment.body.includes(msgMarker)
           );
 
@@ -87,8 +87,7 @@ runs:
               });
               core.info("New comment created.");
             }
-            
+
             // Fail the action
             core.setFailed('Branch name validation failed');
           }
-
