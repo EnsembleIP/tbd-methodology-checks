@@ -14,11 +14,11 @@ inputs:
   branch-pattern:
     description: "Regular expression pattern for validating branch name format."
     required: false
-    default: "^(bug|story|task|spike)/QD-\\d+-[a-z0-9-]+"
+    default: "^(bug|story|task|spike)/QD-\\d+-[a-z0-9-]+$"
   commit-pattern:
     description: "Regular expression pattern for validating commit message format."
     required: false
-    default: "^\\[QD-\\d+\\] .+"
+    default: "^\\[QD-\\d+\\] .+$"
 
 runs:
   using: "composite"

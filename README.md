@@ -25,14 +25,9 @@ permissions:
   pull-requests: write
 
 jobs:
-  validate-pr:
+  methodology-checks:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      
       - name: TBD Methodology Checks
         uses: ensembleip/tbd-methodology-checks@v1
 ```
@@ -154,4 +149,3 @@ The action automatically uses `github.token` provided by GitHub Actions, so no t
 - PRs targeting branches starting with `release/` must use cherry-pick branch names and are automatically closed if they don't match.
 - All PRs are validated for branch name format and commit message format.
 - The action uses the GitHub REST API to manage PRs efficiently.
-- Make sure to checkout the code with `fetch-depth: 0` to validate all commits in the PR.
