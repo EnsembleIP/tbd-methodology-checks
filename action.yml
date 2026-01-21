@@ -19,25 +19,287 @@ inputs:
     description: "Regular expression pattern for validating commit message format."
     required: false
     default: "^\\[QD-\\d+\\] .+$"
+  commit-example:
+    description: "Example commit message to display in error messages."
+    required: false
+    default: "[QD-123] Your commit message here"
 
 runs:
   using: "composite"
   steps:
-    - name: Check PR branches
-      uses: ./validate-pr-branches
+    - name: Validate branch name
+      id: validate-branch
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      env:
+        BRANCH_PATTERN: ${{ inputs.branch-pattern }}
+        COMMENT_MARKER: ${{ inputs.comment-marker }}
       with:
-        cherry-pick-branch-regex: ${{ inputs.cherry-pick-branch-regex }}
-        example-cherry-pick-branch: ${{ inputs.example-cherry-pick-branch }}
+        script: |
+          const branchPattern = new RegExp(process.env.BRANCH_PATTERN);
+          const branchName = context.payload.pull_request.head.ref;
+          const msgMarker = process.env.COMMENT_MARKER;
+          const owner = context.repo.owner;
+          const repo = context.repo.repo;
+          const prNumber = context.payload.pull_request.number;
 
-    - name: Validate branch name format
-      uses: ./branch-name-format
-      with:
-        branch-pattern: ${{ inputs.branch-pattern }}
+          core.info(`Validating branch name: ${branchName}`);
 
-    - name: Validate commit name format
-      uses: ./commit-name-format
+          const isValid = branchPattern.test(branchName);
+          // Find and delete existing comment from this action
+          const { data: comments } = await github.rest.issues.listComments({
+            owner,
+            repo,
+            issue_number: prNumber,
+            per_page: 100
+          });
+
+          const existingComment = comments.find(comment =>
+            comment.body && comment.body.includes(msgMarker)
+          );
+
+          if (isValid) {
+            if (existingComment) {
+              // Delete previous comment
+              await github.rest.issues.deleteComment({
+                owner,
+                repo,
+                comment_id: existingComment.id
+              });
+              core.info("Previous PR comment removed.");
+            }
+            core.info("✅ Branch name follows the required format!");
+          } else {
+            // Build comment body
+            let commentBody = `${msgMarker}\n### ❌ Branch Name Validation Failed\n\n`;
+            commentBody += `Branch name \`${branchName}\` does not match the required pattern.\n\n`;
+            commentBody += `**Required pattern:** \`${process.env.BRANCH_PATTERN}\`\n\n`;
+            commentBody += `**Examples of valid branch names:**\n`;
+            commentBody += `- \`bug/QD-1234-fix-login-issue\`\n`;
+            commentBody += `- \`story/QD-456-add-user-dashboard\`\n`;
+            commentBody += `- \`task/QD-789-update-dependencies\`\n`;
+            commentBody += `- \`spike/QD-321-research-new-api\`\n\n`;
+
+            // Create or update comment
+            if (existingComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existingComment.id,
+                body: commentBody
+              });
+              core.info("Existing comment updated.");
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body: commentBody
+              });
+              core.info("New comment created.");
+            }
+
+            // Fail the action
+            core.setFailed('Branch name validation failed');
+          }
+
+
+    - name: Validate commit names
+      id: validate-commits
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      env:
+        COMMIT_PATTERN: ${{ inputs.commit-pattern }}
+        COMMENT_MARKER: ${{ inputs.comment-marker }}
+        COMMIT_EXAMPLE: ${{ inputs.commit-example }}
       with:
-        commit-pattern: ${{ inputs.commit-pattern }}
+        script: |
+          const pattern = new RegExp(process.env.COMMIT_PATTERN);
+          const owner = context.repo.owner;
+          const repo = context.repo.repo;
+          const prNumber = context.payload.pull_request.number;
+          const msgMarker = process.env.COMMENT_MARKER;
+          const commitExample = process.env.COMMIT_EXAMPLE;
+
+          // Fetch all commits in the PR (with pagination to handle PRs with >100 commits)
+          core.info(`Fetching commits for PR #${prNumber}...`);
+          const commits = await github.paginate(github.rest.pulls.listCommits, {
+            owner,
+            repo,
+            pull_number: prNumber,
+            per_page: 100,
+          });
+
+          core.info(`Found ${commits.length} total commits in PR.`);
+
+          // Filter out merge commits
+          const nonMergeCommits = commits.filter(commit => {
+            const isMerge = commit.parents && commit.parents.length > 1;
+            const messageStartsWithMerge = commit.commit.message.startsWith("Merge");
+            return !isMerge && !messageStartsWithMerge;
+          });
+
+          core.info(`Validating ${nonMergeCommits.length} non-merge commits...`);
+
+          // Validate commit messages against the pattern
+          const invalidCommits = [];
+
+          for (const commit of nonMergeCommits) {
+            const message = commit.commit.message;
+            const firstLine = message.split('\n')[0];
+
+            if (!pattern.test(firstLine)) {
+              invalidCommits.push({
+                sha: commit.sha.substring(0, 7),
+                fullSha: commit.sha,
+                message: firstLine
+              });
+            }
+          }
+
+          const isValid = invalidCommits.length === 0;
+
+          // Find existing comment from this action
+          const { data: comments } = await github.rest.issues.listComments({
+            owner,
+            repo,
+            issue_number: prNumber,
+            per_page: 100
+          });
+
+          const existingComment = comments.find(comment =>
+            comment.body && comment.body.includes(msgMarker)
+          );
+          if (isValid) {
+            if (existingComment) {
+              // Delete previous comment
+              await github.rest.issues.deleteComment({
+                owner,
+                repo,
+                comment_id: existingComment.id
+              });
+              core.info("Previous comment removed.");
+            }
+            core.info("✅ All commits follow the required naming format!");
+          } else {
+            const commitList = invalidCommits.map(c =>
+              `- \`${c.sha}\`: ${c.message}`
+            ).join('\n');
+            let commentBody = `${msgMarker}\n### ❌ Commit Name Validation Failed\n\n`;
+            commentBody += `The following commit(s) do not follow the required format ` +
+              `\`[QD-{issue-key}] {message}\`:\n\n`;
+            commentBody += `${commitList}\n\n`;
+            commentBody += `**Required format:** \`${commitExample}\`\n\n`;
+            commentBody += `Please update the commit messages to follow the required format. You can use:\n`;
+            commentBody += `\`\`\`bash\n`;
+            commentBody += `git rebase -i HEAD~n  # where n is the number of commits to edit\n`;
+            commentBody += `# Then use 'reword' to change commit messages\n`;
+            commentBody += `\`\`\`\n\n`;
+            commentBody += `*Note: Merge commits are automatically excluded from this validation.*\n`;
+
+            // Create or update comment
+            if (existingComment) {
+              core.info("Updating existing validation comment...");
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existingComment.id,
+                body: commentBody
+              });
+              core.info("Existing comment updated.");
+            } else {
+              core.info("Creating new validation comment...");
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body: commentBody
+              });
+              core.info("New comment created.");
+            }
+
+            // Fail the action
+            core.setFailed(`${invalidCommits.length} commit(s) with invalid names`);
+          }
+
+    - name: Only bug cherry-picks to release branches
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      env:
+        BRANCH_REGEX: ${{ inputs.cherry-pick-branch-regex }}
+        EXAMPLE_BRANCH: ${{ inputs.example-cherry-pick-branch }}
+      with:
+        script: |
+          const pr = context.payload.pull_request;
+          const baseRef = pr.base?.ref || '';
+          const headRef = pr.head?.ref || '';
+
+          // Check if head branch is a release/* branch - these are dead ends and should never be merged
+          if (headRef.startsWith('release/')) {
+            const body =
+              `**Release branches are dead ends** and are never merged back.\n\n` +
+              `Your head branch is \`${headRef}\`, which is a release branch. ` +
+              `Release branches should not be merged into other branches. Closing this PR now.`;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              body,
+            });
+
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              state: 'closed',
+            });
+
+            core.setFailed(
+              `Head branch "${headRef}" is a release branch and cannot be merged. Release branches are dead ends.`
+            );
+            return;
+          }
+
+          if (!baseRef.startsWith('release/')) {
+            core.info(`Base branch is "${baseRef}", not release/*; skipping.`);
+            return;
+          }
+
+          const branchRegex = new RegExp(process.env.BRANCH_REGEX);
+          const exampleBranch = process.env.EXAMPLE_BRANCH;
+          const isAllowed = branchRegex.test(headRef);
+
+          if (isAllowed) {
+            core.info(`Head branch "${headRef}" matches expected cherry-pick format; ok.`);
+            return;
+          }
+
+          const body =
+            `**Only bug cherry-pick PRs are allowed** for release branches.\n\n` +
+            `Your head branch is \`${headRef}\`, which does not match the required format:\n\n` +
+            `- \`${exampleBranch}\`\n\n` +
+            `Please rename your branch to the correct format and open a new PR. Closing this PR now.`;
+
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: pr.number,
+            body,
+          });
+
+          await github.rest.pulls.update({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            pull_number: pr.number,
+            state: 'closed',
+          });
+
+          core.setFailed(
+            `Invalid head branch "${headRef}" for base "${baseRef}". Required format: ${exampleBranch}`
+          );
 
 branding:
   icon: "git-branch"
