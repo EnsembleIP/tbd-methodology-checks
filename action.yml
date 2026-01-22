@@ -23,7 +23,7 @@ inputs:
     description: "Example commit message to display in error messages."
     required: false
     default: "[QD-123] Your commit message here"
-    
+
 
 runs:
   using: "composite"
