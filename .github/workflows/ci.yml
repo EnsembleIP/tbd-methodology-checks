@@ -1,4 +1,4 @@
-name: CI
+name: ci
 
 on:
   push:
@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   methodology-checks:
-    name: Methodology Checks
+    name: methodology checks
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -23,7 +23,7 @@ jobs:
       - name: Run TBD Methodology Checks
         uses: ./
   validate-structure:
-    name: Validate Repository Structure
+    name: validate structure
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -37,8 +37,8 @@ jobs:
           fi
           echo "✅ action.yml file exists"
 
-  lint-yaml:
-    name: lint-yaml
+  lint:
+    name: lint
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -58,8 +58,8 @@ jobs:
           yamllint -f colored .
 
   required-checks-pass:
-    name: Required Checks Pass
-    needs: [methodology-checks, validate-structure, lint-yaml]
+    name: required checks
+    needs: [methodology-checks, validate-structure, lint]
     runs-on: ubuntu-latest
     steps:
       - name: Required Checks Passed
