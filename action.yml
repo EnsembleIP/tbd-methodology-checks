@@ -23,6 +23,7 @@ inputs:
     description: "Example commit message to display in error messages."
     required: false
     default: "[QD-123] Your commit message here"
+    
 
 runs:
   using: "composite"
@@ -33,7 +34,7 @@ runs:
       uses: actions/github-script@v7
       env:
         BRANCH_PATTERN: ${{ inputs.branch-pattern }}
-        COMMENT_MARKER: ${{ inputs.comment-marker }}
+        COMMENT_MARKER: "<!-- validate-branch-name-action -->"
       with:
         script: |
           const branchPattern = new RegExp(process.env.BRANCH_PATTERN);
@@ -46,8 +47,8 @@ runs:
           core.info(`Validating branch name: ${branchName}`);
 
           const isValid = branchPattern.test(branchName);
-          // Find and delete existing comment from this action
-          const { data: comments } = await github.rest.issues.listComments({
+          // Find and delete existing comment from this action (with pagination)
+          const comments = await github.paginate(github.rest.issues.listComments, {
             owner,
             repo,
             issue_number: prNumber,
@@ -112,8 +113,8 @@ runs:
       uses: actions/github-script@v7
       env:
         COMMIT_PATTERN: ${{ inputs.commit-pattern }}
-        COMMENT_MARKER: ${{ inputs.comment-marker }}
         COMMIT_EXAMPLE: ${{ inputs.commit-example }}
+        COMMENT_MARKER: "<!-- validate-commit-names-action -->"
       with:
         script: |
           const pattern = new RegExp(process.env.COMMIT_PATTERN);
@@ -161,8 +162,8 @@ runs:
 
           const isValid = invalidCommits.length === 0;
 
-          // Find existing comment from this action
-          const { data: comments } = await github.rest.issues.listComments({
+          // Find existing comment from this action (with pagination)
+          const comments = await github.paginate(github.rest.issues.listComments, {
             owner,
             repo,
             issue_number: prNumber,
@@ -188,8 +189,7 @@ runs:
               `- \`${c.sha}\`: ${c.message}`
             ).join('\n');
             let commentBody = `${msgMarker}\n### ❌ Commit Name Validation Failed\n\n`;
-            commentBody += `The following commit(s) do not follow the required format ` +
-              `\`[QD-{issue-key}] {message}\`:\n\n`;
+            commentBody += `The following commit(s) do not follow the required format:\n\n`;
             commentBody += `${commitList}\n\n`;
             commentBody += `**Required format:** \`${commitExample}\`\n\n`;
             commentBody += `Please update the commit messages to follow the required format. You can use:\n`;
