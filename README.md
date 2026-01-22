@@ -50,10 +50,19 @@ jobs:
 
 ## How It Works
 
-The action performs three validation steps:
+The action performs three validation steps, executed in this order:
 
-### 1. Check PR Branches (for PRs targeting release branches)
+### 1. Validate Branch Name Format
+- **Validates the branch name** against the configured branch-pattern
+- Default pattern enforces: `(bug|story|task|spike)/QD-<number>-<description>`
+- Fails the check if the branch name doesn't match the pattern
 
+### 2. Validate Commit Message Format
+- **Validates all commit messages** in the PR against the configured commit-pattern
+- Default pattern enforces: `[QD-<number>] <message>`
+- Fails the check if any commit message doesn't match the pattern
+
+### 3. Check PR Branches (for PRs targeting release branches)
 - **Checks if the PR targets a release branch** (branches starting with `release/`)
 - **Validates the head branch** against the configured cherry-pick regex pattern
 - If validation **fails**:
@@ -62,19 +71,7 @@ The action performs three validation steps:
   - Fails the GitHub Action check
 - If validation **passes** or the PR doesn't target a release branch:
   - The check passes silently
-
-### 2. Validate Branch Name Format
-
-- **Validates the branch name** against the configured branch-pattern
-- Default pattern enforces: `(bug|story|task|spike)/QD-<number>-<description>`
-- Fails the check if the branch name doesn't match the pattern
-
-### 3. Validate Commit Message Format
-
-- **Validates all commit messages** in the PR against the configured commit-pattern
-- Default pattern enforces: `[QD-<number>] <message>`
-- Fails the check if any commit message doesn't match the pattern
-
+  
 ## Customization
 
 You can customize any of the validation patterns:
